@@ -1,9 +1,7 @@
-import express from "express";
-import fetch from "node-fetch";
-import cors from "cors";
-import dotenv from "dotenv";
-
-dotenv.config();
+const express = require("express");
+const fetch = require("node-fetch");
+const cors = require("cors");
+require("dotenv").config();
 
 const app = express();
 app.use(cors());
@@ -16,7 +14,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
    HEALTH CHECK
 ======================= */
 app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.status(200).json({ status: "ok" });
 });
 
 /* =======================
@@ -36,8 +34,7 @@ app.post("/analyze", async (req, res) => {
         : "Describe the image clearly and concisely.";
 
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" +
-        GEMINI_API_KEY,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -63,16 +60,16 @@ app.post("/analyze", async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(500).json({ error: data });
+      return res.status(500).json(data);
     }
 
     const text =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "No response from Gemini";
 
     res.json({ text });
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Server error" });
   }
 });
