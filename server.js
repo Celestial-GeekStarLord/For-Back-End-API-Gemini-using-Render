@@ -4,58 +4,82 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 dotenv.config();
-const app = express();
 
+const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const PORT = process.env.PORT || 3000;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+/* =======================
+   HEALTH CHECK
+======================= */
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+/* =======================
+   GEMINI IMAGE ANALYSIS
+======================= */
 app.post("/analyze", async (req, res) => {
   try {
-    const { base64Image, query, mode } = req.body;
+    const { query, image, mode } = req.body;
 
-    if (!base64Image || !query) {
-      return res.status(400).json({ error: "Missing data" });
+    if (!image) {
+      return res.status(400).json({ error: "Image is required" });
     }
 
-    const prompt =
+    const instruction =
       mode === "list"
-        ? "List visible objects in bullet points."
-        : "Describe the image clearly for a blind person.";
-
-    const body = {
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: `${prompt}\nUser query: ${query}` },
-            {
-              inline_data: {
-                mime_type: "image/jpeg",
-                data: base64Image
-              }
-            }
-          ]
-        }
-      ]
-    };
+        ? "ONLY list visible objects in bullet points. No extra text."
+        : "Describe the image clearly and concisely.";
 
     const response = await fetch(
-      `${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" +
+        GEMINI_API_KEY,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: `${instruction}\n\nUser request: ${query}` },
+                {
+                  inline_data: {
+                    mime_type: "image/jpeg",
+                    data: image,
+                  },
+                },
+              ],
+            },
+          ],
+        }),
       }
     );
 
     const data = await response.json();
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.toString() });
+
+    if (!response.ok) {
+      return res.status(500).json({ error: data });
+    }
+
+    const text =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response from Gemini";
+
+    res.json({ text });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-app.listen(3000, () => console.log("Gemini backend running"));
+/* =======================
+   START SERVER
+======================= */
+app.listen(PORT, () => {
+  console.log(`Gemini backend running on port ${PORT}`);
+});
