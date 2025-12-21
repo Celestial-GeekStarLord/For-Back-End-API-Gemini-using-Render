@@ -1,35 +1,61 @@
 import express from "express";
-import fetch from "node-fetch";
+import cors from "cors";
+import multer from "multer";
+import axios from "axios";
 
 const app = express();
-app.use(express.json());
+const upload = multer();
+const PORT = process.env.PORT || 3000;
 
-// ✅ HEALTH CHECK (REQUIRED BY RENDER)
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+
+// ✅ ROOT health check (VERY IMPORTANT)
+app.get("/", (req, res) => {
+  res.send("Gemini backend is running");
 });
 
-// ✅ GEMINI ENDPOINT
-app.post("/gemini", async (req, res) => {
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+// 🔮 Gemini Vision endpoint
+app.post("/gemini-vision", upload.single("image"), async (req, res) => {
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    const { query, mode, base64Image } = req.body;
+
+    const prompt =
+      mode === "list"
+        ? "ONLY list visible objects as bullet points."
+        : "Describe the scene clearly and concisely.";
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req.body),
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: query || prompt },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: base64Image,
+                },
+              },
+            ],
+          },
+        ],
       }
     );
 
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.json(response.data);
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: "Gemini request failed" });
   }
 });
 
-// 🔴 THIS LINE FIXES YOUR ISSUE
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
