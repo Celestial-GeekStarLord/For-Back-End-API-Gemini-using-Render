@@ -8,17 +8,17 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: "15mb" }));
 
-// ✅ Root check
+// ✅ Root
 app.get("/", (req, res) => {
   res.send("Gemini backend is running");
 });
 
-// ✅ Health check
+// ✅ Health
 app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.status(200).json({ status: "ok" });
 });
 
-// 🔮 Gemini Vision endpoint (JSON ONLY)
+// 🔮 Gemini Vision
 app.post("/gemini-vision", async (req, res) => {
   try {
     const { query, mode, base64Image } = req.body;
@@ -53,8 +53,8 @@ app.post("/gemini-vision", async (req, res) => {
     );
 
     res.json(response.data);
-  } catch (error) {
-    console.error(error.response?.data || error.message);
+  } catch (err) {
+    console.error(err.response?.data || err.message);
     res.status(500).json({ error: "Gemini request failed" });
   }
 });
